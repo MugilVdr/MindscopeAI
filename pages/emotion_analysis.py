@@ -160,6 +160,10 @@ def emotion_analysis_page():
                 urgency_score=final_result["urgency_score"],
                 triage_level=final_result["triage_level"],
                 triage_reason=final_result["triage_reason"],
+                text_raw_label=text_result["raw_label"],
+                face_raw_label=face_result["raw_label"] if face_result else None,
+                text_top_predictions=text_result["top_predictions"],
+                face_top_predictions=face_result["top_predictions"] if face_result else [],
             )
 
             st.success("Analysis saved successfully.")

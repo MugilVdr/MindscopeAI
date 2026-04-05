@@ -41,6 +41,10 @@ def ensure_database():
         urgency_score REAL,
         triage_level TEXT,
         triage_reason TEXT,
+        text_raw_label TEXT,
+        face_raw_label TEXT,
+        text_top_predictions TEXT,
+        face_top_predictions TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id)
     )
@@ -54,6 +58,10 @@ def ensure_database():
     _ensure_column(cursor, "emotion_logs", "urgency_score", "REAL")
     _ensure_column(cursor, "emotion_logs", "triage_level", "TEXT")
     _ensure_column(cursor, "emotion_logs", "triage_reason", "TEXT")
+    _ensure_column(cursor, "emotion_logs", "text_raw_label", "TEXT")
+    _ensure_column(cursor, "emotion_logs", "face_raw_label", "TEXT")
+    _ensure_column(cursor, "emotion_logs", "text_top_predictions", "TEXT")
+    _ensure_column(cursor, "emotion_logs", "face_top_predictions", "TEXT")
 
     conn.commit()
     conn.close()

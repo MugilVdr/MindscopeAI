@@ -49,6 +49,10 @@ class DatabaseTests(unittest.TestCase):
             urgency_score REAL,
             triage_level TEXT,
             triage_reason TEXT,
+            text_raw_label TEXT,
+            face_raw_label TEXT,
+            text_top_predictions TEXT,
+            face_top_predictions TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
@@ -77,12 +81,18 @@ class DatabaseTests(unittest.TestCase):
         db_service.save_prediction(
             user[0], "sample text", "Sad", "Stress", "Needs a break",
             text_confidence=0.84, face_confidence=0.67, support_level="Moderate", input_source="Text + Face",
-            urgency_score=0.72, triage_level="Needs Attention", triage_reason="hopeless"
+            urgency_score=0.72, triage_level="Needs Attention", triage_reason="hopeless",
+            text_raw_label="Stress", face_raw_label="Sad",
+            text_top_predictions=[{"label": "Stress", "score": 0.84}],
+            face_top_predictions=[{"label": "Sad", "score": 0.67}]
         )
         db_service.save_prediction(
             user[0], "sample text 2", "Happy", "Positive", "Doing well",
             text_confidence=0.91, face_confidence=0.76, support_level="Low", input_source="Text + Face",
-            urgency_score=0.20, triage_level="Routine", triage_reason="No immediate high-risk phrases detected"
+            urgency_score=0.20, triage_level="Routine", triage_reason="No immediate high-risk phrases detected",
+            text_raw_label="Positive", face_raw_label="Happy",
+            text_top_predictions=[{"label": "Positive", "score": 0.91}],
+            face_top_predictions=[{"label": "Happy", "score": 0.76}]
         )
 
         history = db_service.get_user_history(user[0])
@@ -94,6 +104,7 @@ class DatabaseTests(unittest.TestCase):
 
         recent = db_service.get_recent_predictions(user[0], limit=1)
         self.assertEqual(recent[0][6], "Routine")
+        self.assertEqual(recent[0][7], "Positive")
 
     def test_build_weekly_summary(self):
         db_service.register_user("Test User", "tester", "t@example.com", "secret123")
@@ -102,18 +113,25 @@ class DatabaseTests(unittest.TestCase):
         db_service.save_prediction(
             user[0], "sample 1", "Happy", "Positive", "Doing well",
             text_confidence=0.91, face_confidence=0.80, support_level="Low", input_source="Text + Face",
-            urgency_score=0.20, triage_level="Routine", triage_reason="none"
+            urgency_score=0.20, triage_level="Routine", triage_reason="none",
+            text_raw_label="Positive", face_raw_label="Happy",
+            text_top_predictions=[{"label": "Positive", "score": 0.91}],
+            face_top_predictions=[{"label": "Happy", "score": 0.80}]
         )
         db_service.save_prediction(
             user[0], "sample 2", "Uncertain", "Uncertain", "Mixed signals",
             text_confidence=0.42, face_confidence=0.30, support_level="Review", input_source="Text + Face",
-            urgency_score=0.35, triage_level="Routine", triage_reason="none"
+            urgency_score=0.35, triage_level="Routine", triage_reason="none",
+            text_raw_label="Stress", face_raw_label="Neutral",
+            text_top_predictions=[{"label": "Stress", "score": 0.42}],
+            face_top_predictions=[{"label": "Neutral", "score": 0.30}]
         )
 
         summary = db_service.build_weekly_summary(user[0], days=7)
         self.assertEqual(summary["total_checkins"], 2)
         self.assertIn(summary["trend_direction"], {"Improving", "Worsening", "Mixed"})
         self.assertEqual(summary["uncertain_sessions"], 1)
+        self.assertEqual(summary["raw_label_mismatch_count"], 2)
 
 
 class ServiceTests(unittest.TestCase):

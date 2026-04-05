@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
+import json
 
 from database.db_service import (
     build_weekly_summary,
     get_emotion_counts,
+    get_model_diagnostics,
     get_recent_predictions,
     get_trend_points,
 )
@@ -20,6 +22,7 @@ def analytics_page():
     recent_data = get_recent_predictions(user_id, limit=5)
     trend_data = get_trend_points(user_id, limit=30)
     weekly_summary = build_weekly_summary(user_id, days=7)
+    diagnostics = get_model_diagnostics(user_id, limit=10)
 
     if data:
         try:
@@ -110,8 +113,36 @@ def analytics_page():
             st.subheader("Signal Agreement")
             st.write(
                 f"Text/face agreement sessions: {weekly_summary['agreement_count']} | "
-                f"Disagreement sessions: {weekly_summary['disagreement_count']}"
+                f"Disagreement sessions: {weekly_summary['disagreement_count']} | "
+                f"Raw label mismatches: {weekly_summary['raw_label_mismatch_count']}"
             )
+
+        if diagnostics:
+            st.subheader("Model Diagnostics")
+            diagnostic_rows = []
+            for created_at, mental_state, face_emotion, text_conf, face_conf, text_raw, face_raw, text_top, face_top in diagnostics:
+                text_top_list = json.loads(text_top or "[]")
+                face_top_list = json.loads(face_top or "[]")
+                diagnostic_rows.append({
+                    "Date": created_at,
+                    "Final State": mental_state,
+                    "Face Signal": face_emotion,
+                    "Text Confidence": round(text_conf or 0, 4),
+                    "Face Confidence": round(face_conf or 0, 4),
+                    "Text Raw Label": text_raw,
+                    "Face Raw Label": face_raw,
+                    "Text Top 3": ", ".join(
+                        f"{item['label']} {item['score'] * 100:.1f}%"
+                        for item in text_top_list
+                    ),
+                    "Face Top 3": ", ".join(
+                        f"{item['label']} {item['score'] * 100:.1f}%"
+                        for item in face_top_list
+                    ),
+                })
+
+            diagnostics_df = pd.DataFrame(diagnostic_rows)
+            st.dataframe(diagnostics_df, use_container_width=True)
 
     else:
         st.warning("No data available yet")

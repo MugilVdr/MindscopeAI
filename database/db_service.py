@@ -1,4 +1,5 @@
 import hashlib
+import json
 import sqlite3
 from collections import Counter
 from datetime import UTC, datetime, timedelta
@@ -99,6 +100,10 @@ def save_prediction(
     urgency_score=None,
     triage_level=None,
     triage_reason=None,
+    text_raw_label=None,
+    face_raw_label=None,
+    text_top_predictions=None,
+    face_top_predictions=None,
 ):
     conn = get_connection()
     cursor = conn.cursor()
@@ -107,9 +112,10 @@ def save_prediction(
     INSERT INTO emotion_logs (
         user_id, user_text, face_emotion, mental_state, insight,
         text_confidence, face_confidence, support_level, input_source,
-        urgency_score, triage_level, triage_reason
+        urgency_score, triage_level, triage_reason,
+        text_raw_label, face_raw_label, text_top_predictions, face_top_predictions
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         user_id,
         text,
@@ -123,6 +129,10 @@ def save_prediction(
         urgency_score,
         triage_level,
         triage_reason,
+        text_raw_label,
+        face_raw_label,
+        json.dumps(text_top_predictions or []),
+        json.dumps(face_top_predictions or []),
     ))
     conn.commit()
     conn.close()
@@ -145,6 +155,10 @@ def get_user_history(user_id):
         urgency_score,
         triage_level,
         triage_reason,
+        text_raw_label,
+        face_raw_label,
+        text_top_predictions,
+        face_top_predictions,
         created_at
     FROM emotion_logs
     WHERE user_id=?
@@ -199,6 +213,8 @@ def get_recent_predictions(user_id, limit=10):
         support_level,
         urgency_score,
         triage_level,
+        text_raw_label,
+        face_raw_label,
         created_at
     FROM emotion_logs
     WHERE user_id=?
@@ -221,7 +237,9 @@ def get_trend_points(user_id, limit=30):
         text_confidence,
         support_level,
         urgency_score,
-        triage_level
+        triage_level,
+        text_raw_label,
+        face_raw_label
     FROM emotion_logs
     WHERE user_id=?
     ORDER BY created_at DESC, id DESC
@@ -247,7 +265,11 @@ def get_weekly_checkins(user_id, days=7):
         support_level,
         urgency_score,
         triage_level,
-        input_source
+        input_source,
+        text_raw_label,
+        face_raw_label,
+        text_top_predictions,
+        face_top_predictions
     FROM emotion_logs
     WHERE user_id=? AND created_at >= ?
     ORDER BY created_at ASC, id ASC
@@ -276,7 +298,10 @@ def build_weekly_summary(user_id, days=7):
     dominant_support = Counter(supports).most_common(1)[0][0] if supports else "N/A"
     most_common_triage = Counter(triage_levels).most_common(1)[0][0] if triage_levels else "Routine"
     highest_urgency_row = max(rows, key=lambda row: row[6] or 0)
-    agreement_count = sum(1 for row in face_available if row[1].lower() in row[3].lower() or row[3].lower() in row[1].lower())
+    agreement_count = sum(
+        1 for row in face_available
+        if row[1].lower() in row[3].lower() or row[3].lower() in row[1].lower()
+    )
     disagreement_count = len(face_available) - agreement_count
 
     state_scores = {
@@ -310,5 +335,35 @@ def build_weekly_summary(user_id, days=7):
         "highest_urgency_date": highest_urgency_row[0],
         "agreement_count": agreement_count,
         "disagreement_count": disagreement_count,
+        "raw_label_mismatch_count": sum(
+            1
+            for row in rows
+            if row[9] and row[10] and str(row[9]).lower() != str(row[10]).lower()
+        ),
         "recent_rows": rows[-7:],
     }
+
+
+def get_model_diagnostics(user_id, limit=20):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT
+        created_at,
+        mental_state,
+        face_emotion,
+        text_confidence,
+        face_confidence,
+        text_raw_label,
+        face_raw_label,
+        text_top_predictions,
+        face_top_predictions
+    FROM emotion_logs
+    WHERE user_id=?
+    ORDER BY created_at DESC, id DESC
+    LIMIT ?
+    """, (user_id, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    return rows

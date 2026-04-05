@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
+import json
 
-from database.db_service import build_weekly_summary, get_user_history
+from database.db_service import build_weekly_summary, get_model_diagnostics, get_user_history
 
 
 def reports_page():
@@ -13,6 +14,7 @@ def reports_page():
 
     data = get_user_history(user_id)
     weekly_summary = build_weekly_summary(user_id, days=7)
+    diagnostics = get_model_diagnostics(user_id, limit=10)
 
     if data:
         if weekly_summary:
@@ -47,6 +49,10 @@ def reports_page():
             "Urgency Score",
             "Triage Level",
             "Triage Reason",
+            "Text Raw Label",
+            "Face Raw Label",
+            "Text Top Predictions",
+            "Face Top Predictions",
             "Date"
         ])
 
@@ -77,6 +83,36 @@ def reports_page():
                 "Download Weekly Summary CSV",
                 summary_df.to_csv(index=False),
                 "weekly_summary.csv"
+            )
+
+        if diagnostics:
+            diagnostics_rows = []
+            for created_at, mental_state, face_emotion, text_conf, face_conf, text_raw, face_raw, text_top, face_top in diagnostics:
+                diagnostics_rows.append({
+                    "Date": created_at,
+                    "Final State": mental_state,
+                    "Face Signal": face_emotion,
+                    "Text Raw Label": text_raw,
+                    "Face Raw Label": face_raw,
+                    "Text Top 3": ", ".join(
+                        f"{item['label']} {item['score'] * 100:.1f}%"
+                        for item in json.loads(text_top or "[]")
+                    ),
+                    "Face Top 3": ", ".join(
+                        f"{item['label']} {item['score'] * 100:.1f}%"
+                        for item in json.loads(face_top or "[]")
+                    ),
+                    "Text Confidence": round(text_conf or 0, 4),
+                    "Face Confidence": round(face_conf or 0, 4),
+                })
+
+            diagnostics_df = pd.DataFrame(diagnostics_rows)
+            st.subheader("Model Diagnostics View")
+            st.dataframe(diagnostics_df, use_container_width=True)
+            st.download_button(
+                "Download Diagnostics CSV",
+                diagnostics_df.to_csv(index=False),
+                "model_diagnostics.csv"
             )
 
     else:
