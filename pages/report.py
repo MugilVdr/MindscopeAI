@@ -3,6 +3,7 @@ import pandas as pd
 import json
 
 from database.db_service import build_weekly_summary, get_model_diagnostics, get_user_history
+from services.pdf_report import build_pdf_report
 
 
 def reports_page():
@@ -114,6 +115,21 @@ def reports_page():
                 diagnostics_df.to_csv(index=False),
                 "model_diagnostics.csv"
             )
+
+        try:
+            pdf_bytes = build_pdf_report(
+                st.session_state.get("user_name", "User"),
+                weekly_summary,
+                diagnostics,
+            )
+            st.download_button(
+                "Download PDF Report",
+                pdf_bytes,
+                "mindscope_report.pdf",
+                mime="application/pdf"
+            )
+        except ImportError:
+            st.info("PDF export requires `reportlab`. Install dependencies again after the update to enable it.")
 
     else:
         st.warning("No reports available")

@@ -7,7 +7,7 @@ from unittest import mock
 import numpy as np
 
 from database import db_service
-from services import face_prediction, fusion_engine, text_prediction, safety_guard
+from services import face_prediction, fusion_engine, pdf_report, text_prediction, safety_guard
 
 
 class DatabaseTests(unittest.TestCase):
@@ -226,6 +226,34 @@ class ServiceTests(unittest.TestCase):
 
         self.assertEqual(result["label"], "Uncertain")
         self.assertTrue(result["is_uncertain"])
+
+    def test_pdf_report_line_helpers(self):
+        weekly_summary = {
+            "total_checkins": 3,
+            "dominant_state": "Stress",
+            "trend_direction": "Mixed",
+            "average_text_confidence": 0.61,
+            "average_urgency": 0.42,
+            "uncertain_sessions": 1,
+            "highest_urgency_state": "Anxiety",
+            "highest_urgency_score": 0.75,
+            "agreement_count": 1,
+            "disagreement_count": 2,
+            "raw_label_mismatch_count": 2,
+        }
+        diagnostics = [
+            (
+                "2026-04-05 10:00:00", "Stress", "Uncertain", 0.61, 0.32,
+                "Stress", "Neutral",
+                '[{"label":"Stress","score":0.61}]',
+                '[{"label":"Neutral","score":0.32}]'
+            )
+        ]
+
+        summary_lines = pdf_report._line_items_from_summary(weekly_summary)
+        diagnostics_lines = pdf_report._line_items_from_diagnostics(diagnostics)
+        self.assertTrue(any("Dominant state" in line for line in summary_lines))
+        self.assertTrue(any("Text top 3" in line for line in diagnostics_lines))
 
 
 if __name__ == "__main__":
