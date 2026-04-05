@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 
-from database.db_service import build_weekly_summary, get_model_diagnostics, get_user_history
+from database.db_service import build_weekly_summary, get_change_events, get_model_diagnostics, get_user_history
 from services.pdf_report import build_pdf_report
 
 
@@ -16,6 +16,7 @@ def reports_page():
     data = get_user_history(user_id)
     weekly_summary = build_weekly_summary(user_id, days=7)
     diagnostics = get_model_diagnostics(user_id, limit=10)
+    change_events = get_change_events(user_id, days=7)
 
     if data:
         if weekly_summary:
@@ -37,6 +38,14 @@ def reports_page():
                 f"Text/face signals agreed in {weekly_summary['agreement_count']} sessions "
                 f"and disagreed in {weekly_summary['disagreement_count']} sessions."
             )
+
+        if change_events:
+            st.subheader("Change Analysis")
+            for event in change_events[-5:]:
+                st.write(
+                    f"{event['date']}: {event['from_state']} -> {event['to_state']} ({event['movement']})"
+                )
+                st.caption(f"Triggers: {', '.join(event['triggers'])}")
 
         df = pd.DataFrame(data, columns=[
             "Text",
@@ -121,6 +130,7 @@ def reports_page():
                 st.session_state.get("user_name", "User"),
                 weekly_summary,
                 diagnostics,
+                change_events,
             )
             st.download_button(
                 "Download PDF Report",

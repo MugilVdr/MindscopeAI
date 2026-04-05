@@ -42,7 +42,21 @@ def _line_items_from_diagnostics(diagnostics):
     return lines
 
 
-def build_pdf_report(user_name, weekly_summary, diagnostics):
+def _line_items_from_changes(change_events):
+    lines = []
+    for event in change_events[:5]:
+        lines.append(
+            f"{event['date']} | {event['from_state']} -> {event['to_state']} | {event['movement']}"
+        )
+        lines.append(
+            f"  Triggers: {', '.join(event['triggers'])} | "
+            f"Urgency delta {event['urgency_delta']:+.2f} | "
+            f"Text confidence delta {event['text_conf_delta']:+.2f}"
+        )
+    return lines
+
+
+def build_pdf_report(user_name, weekly_summary, diagnostics, change_events):
     from reportlab.lib.pagesizes import A4
     from reportlab.pdfgen import canvas
 
@@ -72,6 +86,10 @@ def build_pdf_report(user_name, weekly_summary, diagnostics):
 
     write_line("Model Diagnostics Snapshot", size=13, bold=True, gap=20)
     for line in _line_items_from_diagnostics(diagnostics):
+        write_line(line)
+
+    write_line("Change Detection", size=13, bold=True, gap=20)
+    for line in _line_items_from_changes(change_events or []):
         write_line(line)
 
     write_line("Interpretation Notes", size=13, bold=True, gap=20)

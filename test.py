@@ -132,6 +132,19 @@ class DatabaseTests(unittest.TestCase):
         self.assertIn(summary["trend_direction"], {"Improving", "Worsening", "Mixed"})
         self.assertEqual(summary["uncertain_sessions"], 1)
         self.assertEqual(summary["raw_label_mismatch_count"], 2)
+        self.assertEqual(len(summary["change_events"]), 1)
+        self.assertIn(summary["change_events"][0]["movement"], {"Improving", "Worsening", "Stable"})
+
+    def test_change_event_detection(self):
+        rows = [
+            ("2026-04-01 10:00:00", "Positive", 0.90, "Happy", 0.80, "Low", 0.20, "Routine", "Text + Face", "Positive", "Happy", "[]", "[]"),
+            ("2026-04-02 10:00:00", "Stress", 0.60, "Sad", 0.70, "Moderate", 0.50, "Needs Attention", "Text + Face", "Stress", "Sad", "[]", "[]"),
+            ("2026-04-03 10:00:00", "Uncertain", 0.35, "Uncertain", 0.30, "Review", 0.55, "Routine", "Text + Face", "Stress", "Neutral", "[]", "[]"),
+        ]
+        events = db_service.build_change_events_from_rows(rows)
+        self.assertEqual(len(events), 2)
+        self.assertTrue(any("Urgency spiked" in trigger for trigger in events[0]["triggers"]))
+        self.assertTrue(any("Session became uncertain" in trigger for trigger in events[1]["triggers"]))
 
 
 class ServiceTests(unittest.TestCase):
@@ -249,11 +262,24 @@ class ServiceTests(unittest.TestCase):
                 '[{"label":"Neutral","score":0.32}]'
             )
         ]
+        changes = [
+            {
+                "date": "2026-04-05 11:00:00",
+                "from_state": "Positive",
+                "to_state": "Stress",
+                "movement": "Worsening",
+                "triggers": ["Urgency spiked"],
+                "urgency_delta": 0.30,
+                "text_conf_delta": -0.20,
+            }
+        ]
 
         summary_lines = pdf_report._line_items_from_summary(weekly_summary)
         diagnostics_lines = pdf_report._line_items_from_diagnostics(diagnostics)
+        change_lines = pdf_report._line_items_from_changes(changes)
         self.assertTrue(any("Dominant state" in line for line in summary_lines))
         self.assertTrue(any("Text top 3" in line for line in diagnostics_lines))
+        self.assertTrue(any("Worsening" in line for line in change_lines))
 
 
 if __name__ == "__main__":

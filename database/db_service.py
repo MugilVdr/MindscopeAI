@@ -340,6 +340,7 @@ def build_weekly_summary(user_id, days=7):
             for row in rows
             if row[9] and row[10] and str(row[9]).lower() != str(row[10]).lower()
         ),
+        "change_events": build_change_events_from_rows(rows),
         "recent_rows": rows[-7:],
     }
 
@@ -367,3 +368,69 @@ def get_model_diagnostics(user_id, limit=20):
     rows = cursor.fetchall()
     conn.close()
     return rows
+
+
+def build_change_events_from_rows(rows):
+    if len(rows) < 2:
+        return []
+
+    state_scores = {
+        "Positive": 5,
+        "Neutral": 4,
+        "Stress": 3,
+        "Anxiety": 2,
+        "Depression": 1,
+        "Uncertain": 3,
+    }
+
+    events = []
+    for previous, current in zip(rows, rows[1:]):
+        prev_date, prev_state, prev_text_conf, prev_face, prev_face_conf, prev_support, prev_urgency, prev_triage, _prev_source, prev_text_raw, prev_face_raw, _prev_text_top, _prev_face_top = previous
+        curr_date, curr_state, curr_text_conf, curr_face, curr_face_conf, curr_support, curr_urgency, curr_triage, _curr_source, curr_text_raw, curr_face_raw, _curr_text_top, _curr_face_top = current
+
+        triggers = []
+        prev_score = state_scores.get(prev_state, 3)
+        curr_score = state_scores.get(curr_state, 3)
+        movement = "Stable"
+        if curr_score > prev_score:
+            movement = "Improving"
+        elif curr_score < prev_score:
+            movement = "Worsening"
+
+        if (curr_urgency or 0) - (prev_urgency or 0) >= 0.2:
+            triggers.append("Urgency spiked")
+        if abs((curr_text_conf or 0) - (prev_text_conf or 0)) >= 0.2:
+            triggers.append("Text confidence shifted sharply")
+        if curr_state == "Uncertain" and prev_state != "Uncertain":
+            triggers.append("Session became uncertain")
+        if curr_support and prev_support and curr_support != prev_support:
+            triggers.append(f"Support level changed from {prev_support} to {curr_support}")
+        if curr_triage and prev_triage and curr_triage != prev_triage:
+            triggers.append(f"Triage changed from {prev_triage} to {curr_triage}")
+        if curr_text_raw and curr_face_raw and prev_text_raw and prev_face_raw:
+            prev_mismatch = prev_text_raw.lower() != prev_face_raw.lower()
+            curr_mismatch = curr_text_raw.lower() != curr_face_raw.lower()
+            if curr_mismatch and not prev_mismatch:
+                triggers.append("Text and face signals started disagreeing")
+            elif not curr_mismatch and prev_mismatch:
+                triggers.append("Text and face signals became more aligned")
+
+        if not triggers:
+            triggers.append("No major trigger detected")
+
+        events.append({
+            "date": curr_date,
+            "from_state": prev_state,
+            "to_state": curr_state,
+            "movement": movement,
+            "triggers": triggers,
+            "urgency_delta": round((curr_urgency or 0) - (prev_urgency or 0), 4),
+            "text_conf_delta": round((curr_text_conf or 0) - (prev_text_conf or 0), 4),
+        })
+
+    return events
+
+
+def get_change_events(user_id, days=7):
+    rows = get_weekly_checkins(user_id, days=days)
+    return build_change_events_from_rows(rows)

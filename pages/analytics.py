@@ -4,6 +4,7 @@ import json
 
 from database.db_service import (
     build_weekly_summary,
+    get_change_events,
     get_emotion_counts,
     get_model_diagnostics,
     get_recent_predictions,
@@ -23,6 +24,7 @@ def analytics_page():
     trend_data = get_trend_points(user_id, limit=30)
     weekly_summary = build_weekly_summary(user_id, days=7)
     diagnostics = get_model_diagnostics(user_id, limit=10)
+    change_events = get_change_events(user_id, days=7)
 
     if data:
         try:
@@ -62,6 +64,19 @@ def analytics_page():
                 f"highest urgency session {weekly_summary['highest_urgency_state']} "
                 f"at {weekly_summary['highest_urgency_score'] * 100:.1f}% on {weekly_summary['highest_urgency_date']}."
             )
+
+        if change_events:
+            st.subheader("Change Detection")
+            for event in change_events[-5:]:
+                st.write(
+                    f"{event['date']}: {event['from_state']} -> {event['to_state']} "
+                    f"({event['movement']})"
+                )
+                st.caption(
+                    f"Triggers: {', '.join(event['triggers'])} | "
+                    f"Urgency delta: {event['urgency_delta']:+.2f} | "
+                    f"Text confidence delta: {event['text_conf_delta']:+.2f}"
+                )
 
         if trend_data:
             timeline_df = pd.DataFrame(
