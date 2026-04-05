@@ -1,0 +1,30 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local database and runtime files
+mindscope.db
+*.sqlite
+*.sqlite3
+
+# Streamlit and local secrets
+.streamlit/secrets.toml
+
+# OS/editor artifacts
+.DS_Store
+Thumbs.db
+
+# Data and generated assets that are too large for GitHub
+raw data(zip)/
+extracted_data/
+data_csv/
+
+# Local test and coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
