@@ -2,7 +2,7 @@ import hashlib
 import json
 import sqlite3
 from collections import Counter
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from hmac import compare_digest
 from pathlib import Path
 from secrets import token_hex
@@ -253,7 +253,7 @@ def get_trend_points(user_id, limit=30):
 def get_weekly_checkins(user_id, days=7):
     conn = get_connection()
     cursor = conn.cursor()
-    since = (datetime.now(UTC) - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
 
     cursor.execute("""
     SELECT
