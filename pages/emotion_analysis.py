@@ -23,11 +23,16 @@ def _render_top_predictions(items):
 
 
 def emotion_analysis_page():
-    st.title("Emotion Analysis")
-    st.write("Analyze written thoughts with optional face input from camera or upload.")
+    st.title("Emotional Check-In")
+    st.write(
+        "Use this page for a lightweight AI-assisted check-in. Results are signals, not a diagnosis or clinical assessment."
+    )
+    st.caption(
+        "Best results come from clear text, even lighting, and a front-facing image with one visible face."
+    )
 
     text = st.text_area(
-        "Enter your thoughts",
+        "What would you like to check in about?",
         placeholder="Describe how you feel, what happened today, or what is on your mind."
     )
 
@@ -36,11 +41,11 @@ def emotion_analysis_page():
     uploaded_image = None
 
     with capture_tab:
-        captured_image = st.camera_input("Capture a face image")
+        captured_image = st.camera_input("Capture a front-facing image")
 
     with upload_tab:
         uploaded_image = st.file_uploader(
-            "Upload a face image",
+            "Upload a clear face image",
             type=["jpg", "jpeg", "png"],
             key="face_upload"
         )
@@ -65,10 +70,10 @@ def emotion_analysis_page():
             final_result["triage_reason"] = risk_result["triage_reason"]
 
             summary_col, support_col, source_col, urgency_col = st.columns(4)
-            summary_col.metric("Final Mental State", final_result["mental_state"])
-            support_col.metric("Support Level", final_result["support_level"])
+            summary_col.metric("AI Check-In Result", final_result["mental_state"])
+            support_col.metric("Suggested Support Level", final_result["support_level"])
             source_col.metric("Input Source", final_result["input_source"])
-            urgency_col.metric("Urgency", final_result["triage_level"])
+            urgency_col.metric("Safety Triage", final_result["triage_level"])
 
             if final_result["triage_level"] == "High Alert":
                 st.error(
@@ -97,31 +102,36 @@ def emotion_analysis_page():
                 st.markdown("**Face Model**")
                 _render_score("Face emotion confidence", final_result["face_confidence"])
                 if face_result:
+                    st.caption(face_result["detection_note"])
                     st.caption(
                         f"Threshold: {face_result['threshold'] * 100:.0f}% "
                         f"| Raw top class: {face_result['raw_label']}"
                     )
                     _render_top_predictions(face_result["top_predictions"])
+                    if not face_result["face_detected"]:
+                        st.warning(
+                            "No clear face was detected. The model used a fallback crop, so this result is less reliable."
+                        )
                 else:
                     st.info("No face image provided for this analysis.")
 
             st.subheader("Result Summary")
             result_col1, result_col2 = st.columns(2)
             result_col1.success(
-                f"Text Mental State: {final_result['mental_state']} "
+                f"Text Check-In Signal: {final_result['mental_state']} "
                 f"({_confidence_caption(final_result['text_confidence'])})"
             )
             result_col2.warning(
-                f"Face Emotion: {final_result['face_emotion']} "
+                f"Face Signal: {final_result['face_emotion']} "
                 f"({_confidence_caption(final_result['face_confidence'])})"
             )
 
             if text_result["is_uncertain"] or (face_result and face_result["is_uncertain"]):
                 st.warning(
-                    "One or more model outputs are below the confidence threshold, so the app is marking them as Uncertain."
+                    "One or more outputs are below the confidence threshold, so the app is marking them as Uncertain instead of overstating the result."
                 )
 
-            st.subheader("Insight")
+            st.subheader("Model Summary")
             st.info(final_result["insight"])
 
             st.subheader("Triage Detail")
@@ -129,7 +139,7 @@ def emotion_analysis_page():
             st.progress(min(max(float(final_result["urgency_score"]), 0.0), 1.0))
             st.caption(f"Urgency score: {final_result['urgency_score'] * 100:.1f}%")
 
-            st.subheader("Recommended Next Steps")
+            st.subheader("Suggested Next Steps")
             for recommendation in final_result["recommendations"]:
                 st.write(f"- {recommendation}")
 

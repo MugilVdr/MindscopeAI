@@ -4,8 +4,10 @@ import tempfile
 import unittest
 from unittest import mock
 
+import numpy as np
+
 from database import db_service
-from services import fusion_engine, text_prediction, safety_guard
+from services import face_prediction, fusion_engine, text_prediction, safety_guard
 
 
 class DatabaseTests(unittest.TestCase):
@@ -112,6 +114,20 @@ class ServiceTests(unittest.TestCase):
         )
         self.assertEqual(result["mental_state"], "Uncertain")
         self.assertEqual(result["support_level"], "Review")
+
+    @mock.patch("services.face_prediction._prepare_image")
+    @mock.patch("services.face_prediction._load_model")
+    def test_face_prediction_returns_uncertain_when_confidence_is_low(self, mock_load_model, mock_prepare_image):
+        class DummyModel:
+            def predict(self, features, verbose=0):
+                return [[0.22, 0.08, 0.10, 0.18, 0.17, 0.14, 0.11]]
+
+        mock_load_model.return_value = DummyModel()
+        mock_prepare_image.return_value = (np.zeros((1, 64, 64, 3)), False, "No clear face detected. Using center crop fallback.")
+
+        result = face_prediction.predict_face_emotion(b"fake-image")
+        self.assertEqual(result["label"], "Uncertain")
+        self.assertFalse(result["face_detected"])
 
     def test_safety_guard_detects_high_risk_language(self):
         result = safety_guard.assess_text_risk("I want to die and hurt myself")

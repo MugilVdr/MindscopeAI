@@ -18,6 +18,8 @@ if "logged_in" not in st.session_state:
 
 if not st.session_state["logged_in"]:
     st.title("MindScope AI")
+    st.write("AI-assisted emotional check-ins for reflection, trend tracking, and demo exploration.")
+    st.caption("This app is not a medical device and should not be used as a substitute for professional care.")
     option = st.radio("Select Option", ["Login", "Register"])
 
     if option == "Login":
@@ -27,6 +29,7 @@ if not st.session_state["logged_in"]:
 else:
     st.sidebar.title("MindScope AI")
     st.sidebar.success(f"Welcome {st.session_state['user_name']}")
+    st.sidebar.caption("Use this app as a check-in and tracking tool, not as a clinical judgment system.")
 
     page = st.sidebar.selectbox(
         "Navigation",

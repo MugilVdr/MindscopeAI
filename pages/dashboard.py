@@ -13,7 +13,8 @@ STATE_SCORES = {
 
 
 def dashboard_page():
-    st.title("Dashboard")
+    st.title("Check-In Dashboard")
+    st.caption("This dashboard summarizes past AI-assisted check-ins. Treat it as a trend view, not a diagnosis.")
 
     user_id = st.session_state["user_id"]
     data = get_emotion_counts(user_id)
@@ -49,4 +50,4 @@ def dashboard_page():
                 f"urgency {(urgency_score or 0) * 100:.1f}%, triage {triage_level or 'N/A'}"
             )
     else:
-        st.info("MindScope AI is ready.")
+        st.info("No check-ins yet. Start with the Emotional Check-In page.")
