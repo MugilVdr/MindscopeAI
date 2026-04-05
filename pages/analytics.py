@@ -1,18 +1,25 @@
 import streamlit as st
 import pandas as pd
 
-from database.db_service import get_emotion_counts, get_recent_predictions, get_trend_points
+from database.db_service import (
+    build_weekly_summary,
+    get_emotion_counts,
+    get_recent_predictions,
+    get_trend_points,
+)
 
 
 def analytics_page():
 
     st.title("Analytics Dashboard")
+    st.caption("Use these views to spot trends and uncertainty over time, not to draw clinical conclusions.")
 
     user_id = st.session_state["user_id"]
 
     data = get_emotion_counts(user_id)
     recent_data = get_recent_predictions(user_id, limit=5)
     trend_data = get_trend_points(user_id, limit=30)
+    weekly_summary = build_weekly_summary(user_id, days=7)
 
     if data:
         try:
@@ -31,6 +38,27 @@ def analytics_page():
         )
 
         st.plotly_chart(fig)
+
+        if weekly_summary:
+            st.subheader("Weekly Summary")
+            card1, card2, card3, card4 = st.columns(4)
+            card1.metric("Check-Ins", weekly_summary["total_checkins"])
+            card2.metric("Dominant State", weekly_summary["dominant_state"])
+            card3.metric("Trend", weekly_summary["trend_direction"])
+            card4.metric("Uncertain Sessions", weekly_summary["uncertain_sessions"])
+
+            card5, card6, card7, card8 = st.columns(4)
+            card5.metric("Avg Text Confidence", f"{weekly_summary['average_text_confidence'] * 100:.1f}%")
+            card6.metric("Avg Urgency", f"{weekly_summary['average_urgency'] * 100:.1f}%")
+            card7.metric("Dominant Support", weekly_summary["dominant_support"])
+            card8.metric("Common Triage", weekly_summary["most_common_triage"])
+
+            st.info(
+                f"Weekly interpretation: {weekly_summary['trend_direction']} trend, "
+                f"dominant state {weekly_summary['dominant_state']}, "
+                f"highest urgency session {weekly_summary['highest_urgency_state']} "
+                f"at {weekly_summary['highest_urgency_score'] * 100:.1f}% on {weekly_summary['highest_urgency_date']}."
+            )
 
         if trend_data:
             timeline_df = pd.DataFrame(
@@ -77,6 +105,13 @@ def analytics_page():
                     f"Urgency: {(urgency_score or 0) * 100:.1f}%, "
                     f"Triage: {triage_level or 'N/A'}"
                 )
+
+        if weekly_summary:
+            st.subheader("Signal Agreement")
+            st.write(
+                f"Text/face agreement sessions: {weekly_summary['agreement_count']} | "
+                f"Disagreement sessions: {weekly_summary['disagreement_count']}"
+            )
 
     else:
         st.warning("No data available yet")
