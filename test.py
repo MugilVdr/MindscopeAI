@@ -5,7 +5,7 @@ import unittest
 from unittest import mock
 
 from database import db_service
-from services import fusion_engine, text_prediction
+from services import fusion_engine, text_prediction, safety_guard
 
 
 class DatabaseTests(unittest.TestCase):
@@ -40,6 +40,13 @@ class DatabaseTests(unittest.TestCase):
             face_emotion TEXT,
             mental_state TEXT,
             insight TEXT,
+            text_confidence REAL,
+            face_confidence REAL,
+            support_level TEXT,
+            input_source TEXT,
+            urgency_score REAL,
+            triage_level TEXT,
+            triage_reason TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
@@ -65,12 +72,26 @@ class DatabaseTests(unittest.TestCase):
         db_service.register_user("Test User", "tester", "t@example.com", "secret123")
         user = db_service.login_user("tester", "secret123")
 
-        db_service.save_prediction(user[0], "sample text", "Sad", "Stress", "Needs a break")
-        db_service.save_prediction(user[0], "sample text 2", "Happy", "Positive", "Doing well")
+        db_service.save_prediction(
+            user[0], "sample text", "Sad", "Stress", "Needs a break",
+            text_confidence=0.84, face_confidence=0.67, support_level="Moderate", input_source="Text + Face",
+            urgency_score=0.72, triage_level="Needs Attention", triage_reason="hopeless"
+        )
+        db_service.save_prediction(
+            user[0], "sample text 2", "Happy", "Positive", "Doing well",
+            text_confidence=0.91, face_confidence=0.76, support_level="Low", input_source="Text + Face",
+            urgency_score=0.20, triage_level="Routine", triage_reason="No immediate high-risk phrases detected"
+        )
 
         history = db_service.get_user_history(user[0])
         self.assertEqual(len(history), 2)
         self.assertEqual(db_service.get_latest_emotion(user[0]), "Positive")
+        self.assertEqual(history[0][6], "Low")
+        self.assertEqual(history[0][7], "Text + Face")
+        self.assertEqual(history[0][9], "Routine")
+
+        recent = db_service.get_recent_predictions(user[0], limit=1)
+        self.assertEqual(recent[0][6], "Routine")
 
 
 class ServiceTests(unittest.TestCase):
@@ -81,6 +102,13 @@ class ServiceTests(unittest.TestCase):
         )
         self.assertEqual(result["mental_state"], "Stress")
         self.assertEqual(result["face_emotion"], "Not Provided")
+        self.assertEqual(result["support_level"], "Moderate")
+        self.assertEqual(result["input_source"], "Text Only")
+
+    def test_safety_guard_detects_high_risk_language(self):
+        result = safety_guard.assess_text_risk("I want to die and hurt myself")
+        self.assertEqual(result["triage_level"], "High Alert")
+        self.assertGreater(result["urgency_score"], 0.9)
 
     def test_text_prediction_validates_empty_input(self):
         with self.assertRaises(ValueError):

@@ -44,6 +44,16 @@ def _build_recommendations(final_state):
     return recommendations.get(final_state, recommendations["Neutral"])
 
 
+def _support_level(final_state, text_confidence):
+    if final_state in {"Depression", "Anxiety"} and text_confidence >= 0.8:
+        return "High"
+    if final_state == "Stress" and text_confidence >= 0.7:
+        return "Moderate"
+    if final_state == "Positive":
+        return "Low"
+    return "Watch"
+
+
 def combine_predictions(text_result, face_result=None):
     final_state = text_result["label"]
 
@@ -59,4 +69,6 @@ def combine_predictions(text_result, face_result=None):
         "recommendations": _build_recommendations(final_state),
         "text_confidence": text_result["confidence"],
         "face_confidence": face_result["confidence"] if face_result else None,
+        "support_level": _support_level(final_state, text_result["confidence"]),
+        "input_source": "Text + Face" if face_result else "Text Only",
     }

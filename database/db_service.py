@@ -84,14 +84,44 @@ def login_user(username, password):
     return user[:2]
 
 
-def save_prediction(user_id, text, face_emotion, mental_state, insight):
+def save_prediction(
+    user_id,
+    text,
+    face_emotion,
+    mental_state,
+    insight,
+    text_confidence=None,
+    face_confidence=None,
+    support_level=None,
+    input_source=None,
+    urgency_score=None,
+    triage_level=None,
+    triage_reason=None,
+):
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
-    INSERT INTO emotion_logs (user_id, user_text, face_emotion, mental_state, insight)
-    VALUES (?, ?, ?, ?, ?)
-    """, (user_id, text, face_emotion, mental_state, insight))
+    INSERT INTO emotion_logs (
+        user_id, user_text, face_emotion, mental_state, insight,
+        text_confidence, face_confidence, support_level, input_source,
+        urgency_score, triage_level, triage_reason
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        user_id,
+        text,
+        face_emotion,
+        mental_state,
+        insight,
+        text_confidence,
+        face_confidence,
+        support_level,
+        input_source,
+        urgency_score,
+        triage_level,
+        triage_reason,
+    ))
     conn.commit()
     conn.close()
 
@@ -101,7 +131,19 @@ def get_user_history(user_id):
     cursor = conn.cursor()
 
     cursor.execute("""
-    SELECT user_text, face_emotion, mental_state, insight, created_at
+    SELECT
+        user_text,
+        face_emotion,
+        mental_state,
+        insight,
+        text_confidence,
+        face_confidence,
+        support_level,
+        input_source,
+        urgency_score,
+        triage_level,
+        triage_reason,
+        created_at
     FROM emotion_logs
     WHERE user_id=?
     ORDER BY created_at DESC, id DESC
@@ -140,3 +182,49 @@ def get_latest_emotion(user_id):
     row = cursor.fetchone()
     conn.close()
     return row[0] if row else None
+
+
+def get_recent_predictions(user_id, limit=10):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT
+        mental_state,
+        text_confidence,
+        face_emotion,
+        face_confidence,
+        support_level,
+        urgency_score,
+        triage_level,
+        created_at
+    FROM emotion_logs
+    WHERE user_id=?
+    ORDER BY created_at DESC, id DESC
+    LIMIT ?
+    """, (user_id, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
+def get_trend_points(user_id, limit=30):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    SELECT
+        created_at,
+        mental_state,
+        text_confidence,
+        support_level,
+        urgency_score,
+        triage_level
+    FROM emotion_logs
+    WHERE user_id=?
+    ORDER BY created_at DESC, id DESC
+    LIMIT ?
+    """, (user_id, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    return list(reversed(rows))

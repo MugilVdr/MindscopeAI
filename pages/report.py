@@ -14,7 +14,18 @@ def reports_page():
     if data:
 
         df = pd.DataFrame(data, columns=[
-            "Text", "Face Emotion", "Mental State", "Insight", "Date"
+            "Text",
+            "Face Emotion",
+            "Mental State",
+            "Insight",
+            "Text Confidence",
+            "Face Confidence",
+            "Support Level",
+            "Input Source",
+            "Urgency Score",
+            "Triage Level",
+            "Triage Reason",
+            "Date"
         ])
 
         st.dataframe(df)
