@@ -97,13 +97,21 @@ class DatabaseTests(unittest.TestCase):
 class ServiceTests(unittest.TestCase):
     def test_combine_predictions_without_face(self):
         result = fusion_engine.combine_predictions(
-            {"label": "Stress", "confidence": 0.88},
+            {"label": "Stress", "raw_label": "Stress", "confidence": 0.88, "is_uncertain": False},
             None
         )
         self.assertEqual(result["mental_state"], "Stress")
         self.assertEqual(result["face_emotion"], "Not Provided")
         self.assertEqual(result["support_level"], "Moderate")
         self.assertEqual(result["input_source"], "Text Only")
+
+    def test_combine_predictions_marks_uncertain_when_text_is_low_confidence(self):
+        result = fusion_engine.combine_predictions(
+            {"label": "Uncertain", "raw_label": "Positive", "confidence": 0.31, "is_uncertain": True},
+            {"label": "Happy", "raw_label": "Happy", "confidence": 0.82, "is_uncertain": False}
+        )
+        self.assertEqual(result["mental_state"], "Uncertain")
+        self.assertEqual(result["support_level"], "Review")
 
     def test_safety_guard_detects_high_risk_language(self):
         result = safety_guard.assess_text_risk("I want to die and hurt myself")
@@ -138,6 +146,32 @@ class ServiceTests(unittest.TestCase):
 
         self.assertEqual(result["label"], "Positive")
         self.assertGreater(result["confidence"], 0.6)
+        self.assertEqual(len(result["top_predictions"]), 3)
+
+    @mock.patch("services.text_prediction._load_assets")
+    def test_text_prediction_returns_uncertain_below_threshold(self, mock_load_assets):
+        class DummyVectorizer:
+            def transform(self, texts):
+                class DummyArray:
+                    def toarray(self_inner):
+                        return [[0.1, 0.2, 0.3]]
+                return DummyArray()
+
+        class DummyModel:
+            def predict(self, features, verbose=0):
+                return [[0.34, 0.33, 0.33]]
+
+        class DummyEncoder:
+            classes_ = ["Anxiety", "Positive", "Stress"]
+
+            def inverse_transform(self, values):
+                return [self.classes_[values[0]]]
+
+        mock_load_assets.return_value = (DummyModel(), DummyVectorizer(), DummyEncoder())
+        result = text_prediction.predict_text_mental_state("I feel okay")
+
+        self.assertEqual(result["label"], "Uncertain")
+        self.assertTrue(result["is_uncertain"])
 
 
 if __name__ == "__main__":

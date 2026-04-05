@@ -13,6 +13,7 @@ ENCODER_PATH = BASE_DIR / "models" / "label_encoder.pkl"
 _TEXT_MODEL = None
 _VECTORIZER = None
 _ENCODER = None
+TEXT_CONFIDENCE_THRESHOLD = 0.55
 
 
 def _clean_text(text):
@@ -49,10 +50,28 @@ def predict_text_mental_state(text):
     features = vectorizer.transform([cleaned_text]).toarray()
     probabilities = model.predict(features, verbose=0)[0]
     best_index = int(np.argmax(probabilities))
+    top_predictions = sorted(
+        [
+            {
+                "label": label,
+                "score": float(score),
+            }
+            for label, score in zip(encoder.classes_, probabilities)
+        ],
+        key=lambda item: item["score"],
+        reverse=True,
+    )[:3]
+    best_label = encoder.inverse_transform([best_index])[0]
+    best_confidence = float(probabilities[best_index])
+    final_label = best_label if best_confidence >= TEXT_CONFIDENCE_THRESHOLD else "Uncertain"
 
     return {
-        "label": encoder.inverse_transform([best_index])[0],
-        "confidence": float(probabilities[best_index]),
+        "label": final_label,
+        "raw_label": best_label,
+        "confidence": best_confidence,
+        "is_uncertain": final_label == "Uncertain",
+        "threshold": TEXT_CONFIDENCE_THRESHOLD,
+        "top_predictions": top_predictions,
         "probabilities": {
             label: float(score)
             for label, score in zip(encoder.classes_, probabilities)

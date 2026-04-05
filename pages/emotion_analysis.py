@@ -17,6 +17,11 @@ def _render_score(label, value):
         st.progress(min(max(float(value), 0.0), 1.0))
 
 
+def _render_top_predictions(items):
+    for item in items:
+        st.write(f"{item['label']}: {item['score'] * 100:.1f}%")
+
+
 def emotion_analysis_page():
     st.title("Emotion Analysis")
     st.write("Analyze written thoughts with optional face input from camera or upload.")
@@ -82,25 +87,21 @@ def emotion_analysis_page():
             with conf_col1:
                 st.markdown("**Text Model**")
                 _render_score("Mental state confidence", final_result["text_confidence"])
-                top_text_probs = sorted(
-                    text_result["probabilities"].items(),
-                    key=lambda item: item[1],
-                    reverse=True
-                )[:3]
-                for label, score in top_text_probs:
-                    st.write(f"{label}: {score * 100:.1f}%")
+                st.caption(
+                    f"Threshold: {text_result['threshold'] * 100:.0f}% "
+                    f"| Raw top class: {text_result['raw_label']}"
+                )
+                _render_top_predictions(text_result["top_predictions"])
 
             with conf_col2:
                 st.markdown("**Face Model**")
                 _render_score("Face emotion confidence", final_result["face_confidence"])
                 if face_result:
-                    top_face_probs = sorted(
-                        face_result["probabilities"].items(),
-                        key=lambda item: item[1],
-                        reverse=True
-                    )[:3]
-                    for label, score in top_face_probs:
-                        st.write(f"{label}: {score * 100:.1f}%")
+                    st.caption(
+                        f"Threshold: {face_result['threshold'] * 100:.0f}% "
+                        f"| Raw top class: {face_result['raw_label']}"
+                    )
+                    _render_top_predictions(face_result["top_predictions"])
                 else:
                     st.info("No face image provided for this analysis.")
 
@@ -114,6 +115,11 @@ def emotion_analysis_page():
                 f"Face Emotion: {final_result['face_emotion']} "
                 f"({_confidence_caption(final_result['face_confidence'])})"
             )
+
+            if text_result["is_uncertain"] or (face_result and face_result["is_uncertain"]):
+                st.warning(
+                    "One or more model outputs are below the confidence threshold, so the app is marking them as Uncertain."
+                )
 
             st.subheader("Insight")
             st.info(final_result["insight"])
